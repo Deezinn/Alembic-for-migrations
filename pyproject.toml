@@ -1,9 +1,132 @@
 [project]
 name = "alembic-for-migrations"
 version = "0.1.0"
-description = "Add your description here"
+description = "estudo do alembic"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "alembic>=1.18.4",
+    "alembic[tz]>=1.18.4",
+    "psycopg2-binary>=2.9.12",
+    "pydantic>=2.13.3",
+    "python-dotenv>=1.2.2",
 ]
+
+
+[tool.alembic]
+
+# Caminho para os scripts de migration.
+# Normalmente usa formato POSIX (com /),
+# relativo ao token %(here)s, que aponta para a
+# localização deste arquivo.
+script_location = "%(here)s/alembic"
+
+
+# Template usado para gerar os nomes dos arquivos de migration.
+# O padrão é: %%(rev)s_%%(slug)s
+#
+# Descomente abaixo se quiser prefixar os arquivos
+# com data e hora.
+#
+# Veja todos os tokens disponíveis:
+# https://alembic.sqlalchemy.org/en/latest/tutorial.html
+#
+# file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
+
+
+# Alternativamente, organize migrations em subpastas por data.
+# Necessita
+recursive_version_locations = true
+#
+file_template = "%%(year)d/%%(month).2d/%%(day).2d_%%(hour).2d%%(minute).2d_%%(second).2d_%%(rev)s_%%(slug)s"
+
+
+# Caminhos adicionais adicionados ao sys.path
+# antes da execução.
+# O padrão costuma ser o diretório atual.
+prepend_sys_path = [
+    "."
+]
+
+
+# Timezone usada para renderizar data e hora
+# no nome e conteúdo das migrations.
+#
+# Requer instalação de:
+# pip install alembic[tz]
+#
+# Exemplo:
+timezone = "America/Sao_Paulo"
+
+# Tamanho máximo do campo "slug"
+# truncate_slug_length = 40
+
+
+# Executa o environment durante o comando:
+# alembic revision
+#
+# mesmo sem autogenerate.
+revision_environment = false
+
+
+# Permite detectar arquivos .pyc e .pyo
+# como revisions, mesmo sem o .py original.
+# sourceless = false
+
+
+# Define múltiplos diretórios de versões.
+#
+# Quando usar múltiplas pastas,
+# revisions iniciais precisam usar:
+# --version-path
+#
+# version_locations = [
+#     "%(here)s/alembic/versions",
+#     "%(here)s/foo/bar"
+# ]
+
+
+# Faz busca recursiva nos diretórios
+# definidos em version_locations.
+#
+# Disponível a partir do Alembic 1.10
+# recursive_version_locations = false
+
+
+# Encoding usada nos arquivos gerados
+# pelo script.py.mako
+output_encoding = "utf-8"
+
+
+
+# =====================================
+# Hooks executados após gerar migrations
+# =====================================
+
+
+# Formatar com Black
+#
+# [[tool.alembic.post_write_hooks]]
+# name = "black"
+# type = "console_scripts"
+# entrypoint = "black"
+# options = "-l 79 REVISION_SCRIPT_FILENAME"
+
+
+# Corrigir lint automaticamente com Ruff
+# executando como módulo Python
+#
+# [[tool.alembic.post_write_hooks]]
+# name = "ruff"
+# type = "module"
+# module = "ruff"
+# options = "check --fix REVISION_SCRIPT_FILENAME"
+
+
+# Alternativamente, executar Ruff
+# diretamente pelo binário do sistema
+#
+# [[tool.alembic.post_write_hooks]]
+# name = "ruff"
+# type = "exec"
+# executable = "ruff"
+# options = "check --fix REVISION_SCRIPT_FILENAME"
