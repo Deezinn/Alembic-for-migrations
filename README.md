@@ -1,10 +1,22 @@
-# Alembic for Migrations
-
-Projeto de estudo sobre gerenciamento de migrações de banco de dados utilizando :contentReference[oaicite:0]{index=0} com :contentReference[oaicite:1]{index=1} e :contentReference[oaicite:2]{index=2}.
 
 ---
 
-# Estrutura do projeto
+# Alembic for Migrations
+
+Projeto de estudo sobre gerenciamento de migrations com Alembic, SQLAlchemy e PostgreSQL Global Development Group.
+
+O objetivo deste projeto é estudar:
+
+* versionamento de schema
+* autogenerate
+* controle de revisões
+* rollback
+* organização profissional de migrations
+* uso de `Base.metadata` como fonte da verdade
+
+---
+
+# Arquitetura do projeto
 
 ```bash
 .
@@ -16,9 +28,16 @@ Projeto de estudo sobre gerenciamento de migrações de banco de dados utilizand
 │       └── 2026/
 │           └── 05/
 │               ├── 03_2003_35_0893b3974670_create_account_table.py
-│               └── 03_2009_12_6fe8b1f53f88_add_a_column.py
+│               ├── 03_2009_12_6fe8b1f53f88_add_a_column.py
+│               └── 05_2215_26_3a4a5d3bd82f_.py
 │
 ├── alembic.ini
+│
+├── database/
+│   ├── base.py
+│   ├── engine.py
+│   └── __init__.py
+│
 ├── key/
 │   ├── __init__.py
 │   └── postgres.py
@@ -31,59 +50,184 @@ Projeto de estudo sobre gerenciamento de migrações de banco de dados utilizand
 
 ---
 
-# Arquivos e diretórios
+# Filosofia do projeto
 
-## `alembic/`
+Este projeto **não utiliza**:
 
-Diretório principal do ambiente de migração.
+```python
+Base.metadata.create_all()
+```
 
-Responsável por armazenar:
+Toda evolução do banco é feita exclusivamente via:
 
-- configuração de execução
-- templates
-- histórico de revisões
-- scripts de migração
+```bash
+alembic revision --autogenerate
+alembic upgrade head
+```
 
----
+Benefícios:
 
-## `alembic/env.py`
-
-Arquivo central do Alembic.
-
-Executado sempre que algum comando de migração é chamado.
-
-### Responsabilidades
-
-- criar conexão com banco
-- configurar engine do SQLAlchemy
-- carregar metadados dos modelos
-- executar migrations online ou offline
-
-### Pode ser customizado para
-
-- múltiplos bancos
-- schemas separados
-- logging customizado
-- importação dinâmica de models
+✅ histórico completo
+✅ rollback seguro
+✅ rastreabilidade
+✅ versionamento de schema
+✅ deploy reproduzível
+✅ sincronização entre ambientes
 
 ---
 
-## `alembic/script.py.mako`
+# Diretório `database/`
 
-Template usado na geração automática de migrations.
+Responsável pela infraestrutura de persistência.
 
-Toda vez que executamos:
+## `database/base.py`
+
+Define a classe base compartilhada por todos os modelos ORM.
+
+Exemplo:
+
+```python
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    pass
+```
+
+Essa classe centraliza:
+
+* metadata
+* tabelas registradas
+* constraints
+* integração com Alembic
+
+O Alembic utiliza:
+
+```python
+Base.metadata
+```
+
+como fonte da verdade.
+
+---
+
+## `database/engine.py`
+
+Responsável pela criação da engine.
+
+Exemplo:
+
+```python
+from sqlalchemy import create_engine
+```
+
+Responsabilidades:
+
+* conexão com banco
+* pooling
+* configuração de sessão
+
+---
+
+# Diretório `alembic/`
+
+Ambiente de migrations.
+
+Responsável por:
+
+* geração de revisões
+* execução de upgrade
+* execução de downgrade
+* comparação entre banco e metadata
+
+---
+
+# `alembic/env.py`
+
+Arquivo central do ambiente de migrations.
+
+Executado em comandos como:
+
+```bash
+alembic revision
+alembic upgrade
+alembic downgrade
+```
+
+---
+
+## Fonte da verdade
+
+No projeto:
+
+```python
+target_metadata = Base.metadata
+```
+
+Isso permite ao Alembic:
+
+1. Ler o schema real do banco
+2. Ler o metadata da aplicação
+3. Comparar ambos
+4. Gerar migrations automaticamente
+
+Fluxo:
+
+```text
+Model ORM
+   ↓
+Base.metadata
+   ↓
+Alembic Autogenerate
+   ↓
+Migration
+   ↓
+Database
+```
+
+---
+
+## Execução online
+
+No modo online:
+
+* cria engine
+* abre conexão
+* executa migrations diretamente no banco
+
+---
+
+## Execução offline
+
+No modo offline:
+
+* não abre conexão
+* gera SQL puro
+
+Útil para:
+
+* auditoria
+* revisão manual
+* pipelines CI/CD
+
+---
+
+# `alembic/script.py.mako`
+
+Template usado na geração das migrations.
+
+Sempre que executamos:
 
 ```bash
 alembic revision --autogenerate
 ```
 
-esse template é usado para gerar:
+esse template gera:
 
-- `upgrade()`
-- `downgrade()`
+* `upgrade()`
+* `downgrade()`
 
-Exemplo gerado:
+Exemplo:
 
 ```python
 def upgrade():
@@ -96,17 +240,19 @@ def downgrade():
 
 ---
 
-## `alembic/versions/`
+# `alembic/versions/`
 
-Histórico das migrations.
+Histórico das revisões.
 
-No seu projeto, as migrations estão organizadas por:
+Organização adotada:
 
-- ano
-- mês
-- timestamp
+```bash
+versions/
+└── ano/
+    └── mês/
+```
 
-Estrutura:
+Exemplo:
 
 ```bash
 versions/
@@ -114,93 +260,40 @@ versions/
     └── 05/
 ```
 
-### Vantagens dessa organização
+---
 
-✔ melhor rastreabilidade
-✔ organização cronológica
-✔ facilita projetos grandes
-✔ evita centenas de arquivos no mesmo diretório
+## Vantagens
+
+✅ organização cronológica
+✅ fácil auditoria
+✅ escalabilidade
+✅ manutenção em projetos grandes
 
 ---
 
-## Exemplo de migration
+# Exemplos de migrations
 
-### `03_2003_35_0893b3974670_create_account_table.py`
+## `03_2003_35_0893b3974670_create_account_table.py`
 
-Migration responsável pela criação da tabela de contas.
-
-### `03_2009_12_6fe8b1f53f88_add_a_column.py`
-
-Migration responsável por adicionar nova coluna.
+Criação da tabela `account`.
 
 ---
 
-## `alembic.ini`
+## `03_2009_12_6fe8b1f53f88_add_a_column.py`
 
-Arquivo principal de configuração do Alembic.
-
-Contém:
-
-- localização dos scripts
-- logging
-- conexão com banco
-- configurações globais
-
-Exemplo:
-
-```ini
-script_location = alembic
-```
+Adição de nova coluna.
 
 ---
 
-## `pyproject.toml`
+# Diretório `key/`
 
-Arquivo de configuração do projeto Python.
-
-Usado para:
-
-- dependências
-- build system
-- configuração do projeto
-- integração com ferramentas modernas
-
----
-
-## `uv.lock`
-
-Arquivo de lock gerado pelo :contentReference[oaicite:3]{index=3}.
-
-Garante:
-
-- reprodutibilidade
-- versões fixas
-- builds consistentes
-
----
-
-## `key/`
-
-Pacote responsável pela configuração de conexão com banco.
-
----
-
-## `key/__init__.py`
-
-Transforma o diretório em um pacote Python.
+Responsável pela configuração de conexão.
 
 ---
 
 ## `key/postgres.py`
 
-Módulo com configurações do :contentReference[oaicite:4]{index=4}.
-
-Pode conter:
-
-- URL de conexão
-- engine
-- credenciais
-- helpers de conexão
+Contém a URL de conexão com o banco.
 
 Exemplo:
 
@@ -210,29 +303,80 @@ DATABASE_URL = "postgresql://user:password@localhost/db"
 
 ---
 
-## `LICENSE`
+# `alembic.ini`
 
-Licença do projeto.
+Arquivo principal de configuração.
 
-Define:
+Responsável por:
 
-- permissões de uso
-- distribuição
-- modificação
+* localização do ambiente Alembic
+* logging
+* comportamento global
 
----
+Exemplo:
 
-# Comandos úteis
-
-## Criar migration
-
-```bash
-alembic revision --autogenerate -m "create account table"
+```ini
+script_location = alembic
 ```
 
 ---
 
-## Aplicar migrations
+# `pyproject.toml`
+
+Configuração do projeto Python.
+
+Responsável por:
+
+* dependências
+* build system
+* ferramentas auxiliares
+
+---
+
+# `uv.lock`
+
+Arquivo gerado por uv.
+
+Garante:
+
+* builds reproduzíveis
+* versões fixas
+* ambientes consistentes
+
+---
+
+# Fluxo de trabalho
+
+## 1. Alterar model
+
+Exemplo:
+
+```python
+email = Column(String)
+```
+
+---
+
+## 2. Gerar migration
+
+```bash
+alembic revision --autogenerate -m "add email"
+```
+
+---
+
+## 3. Revisar migration gerada
+
+Sempre revisar:
+
+* rename de tabelas
+* rename de colunas
+* constraints
+* defaults
+
+---
+
+## 4. Aplicar migration
 
 ```bash
 alembic upgrade head
@@ -240,7 +384,7 @@ alembic upgrade head
 
 ---
 
-## Reverter migration
+## 5. Reverter migration
 
 ```bash
 alembic downgrade -1
@@ -248,15 +392,9 @@ alembic downgrade -1
 
 ---
 
-## Ver histórico
+# Comandos úteis
 
-```bash
-alembic history
-```
-
----
-
-## Ver revisão atual
+## Revisão atual
 
 ```bash
 alembic current
@@ -264,3 +402,44 @@ alembic current
 
 ---
 
+## Histórico completo
+
+```bash
+alembic history
+```
+
+---
+
+## Mostrar SQL sem executar
+
+```bash
+alembic upgrade head --sql
+```
+
+---
+
+## Sincronizar Alembic com banco existente
+
+```bash
+alembic stamp head
+```
+
+Usado quando o schema já existe e queremos entregar o controle ao Alembic.
+
+---
+
+# Observações importantes
+
+O autogenerate do Alembic **não substitui revisão manual**.
+
+Toda migration gerada deve ser revisada antes de aplicar em produção.
+
+Principalmente em casos de:
+
+* rename de tabela
+* rename de coluna
+* constraints complexas
+* tipos especiais
+* defaults de servidor
+
+---
