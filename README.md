@@ -1,9 +1,7 @@
-
----
-
+````markdown
 # Alembic for Migrations
 
-Projeto de estudo sobre gerenciamento de migrations com Alembic, SQLAlchemy e PostgreSQL Global Development Group.
+Projeto de estudo sobre gerenciamento de migrations com Alembic, SQLAlchemy e PostgreSQL.
 
 O objetivo deste projeto é estudar:
 
@@ -13,6 +11,8 @@ O objetivo deste projeto é estudar:
 * rollback
 * organização profissional de migrations
 * uso de `Base.metadata` como fonte da verdade
+* sincronização entre código e banco
+* troubleshooting em ambientes reais
 
 ---
 
@@ -20,28 +20,24 @@ O objetivo deste projeto é estudar:
 
 ```bash
 .
-├── alembic/
+├── alembic
 │   ├── env.py
 │   ├── README
 │   ├── script.py.mako
-│   └── versions/
-│       └── 2026/
-│           └── 05/
+│   └── versions
+│       └── 2026
+│           └── 05
 │               ├── 03_2003_35_0893b3974670_create_account_table.py
 │               ├── 03_2009_12_6fe8b1f53f88_add_a_column.py
-│               └── 05_2215_26_3a4a5d3bd82f_.py
-│
+│               └── 15_1328_15_695604cd776d_create_revision_autogenerate.py
 ├── alembic.ini
-│
-├── database/
+├── database
 │   ├── base.py
 │   ├── engine.py
 │   └── __init__.py
-│
-├── key/
+├── key
 │   ├── __init__.py
 │   └── postgres.py
-│
 ├── LICENSE
 ├── pyproject.toml
 ├── README.md
@@ -73,12 +69,15 @@ Benefícios:
 ✅ versionamento de schema
 ✅ deploy reproduzível
 ✅ sincronização entre ambientes
+✅ auditoria técnica
 
 ---
 
 # Diretório `database/`
 
 Responsável pela infraestrutura de persistência.
+
+---
 
 ## `database/base.py`
 
@@ -125,7 +124,8 @@ Responsabilidades:
 
 * conexão com banco
 * pooling
-* configuração de sessão
+* controle de sessão
+* isolamento transacional
 
 ---
 
@@ -139,6 +139,7 @@ Responsável por:
 * execução de upgrade
 * execução de downgrade
 * comparação entre banco e metadata
+* versionamento incremental
 
 ---
 
@@ -268,20 +269,50 @@ versions/
 ✅ fácil auditoria
 ✅ escalabilidade
 ✅ manutenção em projetos grandes
+✅ rastreamento histórico
 
 ---
 
-# Exemplos de migrations
+# Histórico atual de migrations
+
+---
 
 ## `03_2003_35_0893b3974670_create_account_table.py`
 
-Criação da tabela `account`.
+Primeira migration.
+
+Responsável por:
+
+* criação da tabela `account`
+* schema inicial
 
 ---
 
 ## `03_2009_12_6fe8b1f53f88_add_a_column.py`
 
-Adição de nova coluna.
+Segunda migration.
+
+Responsável por:
+
+* evolução incremental do schema
+* adição de coluna
+
+---
+
+## `15_1328_15_695604cd776d_create_revision_autogenerate.py`
+
+Terceira migration.
+
+Gerada com:
+
+```bash
+alembic revision --autogenerate -m "create revision autogenerate"
+```
+
+Responsável por:
+
+* sincronização do ORM com banco
+* validação do fluxo de autogenerate
 
 ---
 
@@ -293,7 +324,7 @@ Responsável pela configuração de conexão.
 
 ## `key/postgres.py`
 
-Contém a URL de conexão com o banco.
+Contém a URL de conexão.
 
 Exemplo:
 
@@ -335,7 +366,7 @@ Responsável por:
 
 # `uv.lock`
 
-Arquivo gerado por uv.
+Arquivo gerado por `uv`.
 
 Garante:
 
@@ -347,6 +378,8 @@ Garante:
 
 # Fluxo de trabalho
 
+---
+
 ## 1. Alterar model
 
 Exemplo:
@@ -357,26 +390,7 @@ email = Column(String)
 
 ---
 
-## 2. Gerar migration
-
-```bash
-alembic revision --autogenerate -m "add email"
-```
-
----
-
-## 3. Revisar migration gerada
-
-Sempre revisar:
-
-* rename de tabelas
-* rename de colunas
-* constraints
-* defaults
-
----
-
-## 4. Aplicar migration
+## 2. Garantir banco sincronizado
 
 ```bash
 alembic upgrade head
@@ -384,7 +398,35 @@ alembic upgrade head
 
 ---
 
-## 5. Reverter migration
+## 3. Gerar migration
+
+```bash
+alembic revision --autogenerate -m "add email"
+```
+
+---
+
+## 4. Revisar migration gerada
+
+Sempre revisar:
+
+* rename de tabelas
+* rename de colunas
+* constraints
+* defaults
+* indexes
+
+---
+
+## 5. Aplicar migration
+
+```bash
+alembic upgrade head
+```
+
+---
+
+## 6. Reverter migration
 
 ```bash
 alembic downgrade -1
@@ -392,7 +434,78 @@ alembic downgrade -1
 
 ---
 
+# Fluxo mental profissional
+
+```text
+Alterar models
+      ↓
+upgrade head
+      ↓
+autogenerate
+      ↓
+revisar migration
+      ↓
+upgrade head
+```
+
+---
+
+# Problemas reais encontrados durante os estudos
+
+---
+
+## Erro: Target database is not up to date
+
+Mensagem:
+
+```text
+Target database is not up to date.
+```
+
+Causa:
+
+Existe migration no código que ainda não foi aplicada no banco.
+
+Correção:
+
+```bash
+alembic upgrade head
+```
+
+Depois:
+
+```bash
+alembic revision --autogenerate -m "nova revision"
+```
+
+---
+
+## Warning: Collation version mismatch
+
+Mensagem:
+
+```text
+database has a collation version mismatch
+```
+
+Causa:
+
+Atualização do sistema operacional alterou a versão da `glibc`.
+
+Correção:
+
+```sql
+REINDEX DATABASE postgres;
+ALTER DATABASE postgres REFRESH COLLATION VERSION;
+```
+
+Esse warning não impede o Alembic de funcionar, mas deve ser tratado.
+
+---
+
 # Comandos úteis
+
+---
 
 ## Revisão atual
 
@@ -410,6 +523,14 @@ alembic history
 
 ---
 
+## Mostrar heads
+
+```bash
+alembic heads
+```
+
+---
+
 ## Mostrar SQL sem executar
 
 ```bash
@@ -418,7 +539,7 @@ alembic upgrade head --sql
 
 ---
 
-## Sincronizar Alembic com banco existente
+## Sincronizar banco existente
 
 ```bash
 alembic stamp head
@@ -441,5 +562,5 @@ Principalmente em casos de:
 * constraints complexas
 * tipos especiais
 * defaults de servidor
-
----
+* índices compostos
+* migrations destrutivas
